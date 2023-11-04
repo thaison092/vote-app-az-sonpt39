@@ -1,0 +1,43 @@
+$servicePrincipalConnection=Get-AutomationConnection -Name $connectionNamenAsCon  
+$connectionName = "AzureRunAsConnection"
+try
+{
+    "Logging in to Azure..."
+    Add-AzureRmAccount `
+        -ServicePrincipal `
+        -TenantId $servicePrincipalConnection.TenantId `
+        -ApplicationId $servicePrincipalConnection.ApplicationId `
+        -CertificateThumbprint $servicePrincipalConnection.CertificateThumbprint 
+    "Logged in."
+
+}
+catch {
+    if (!$servicePrincipalConnection)
+    {
+        $ErrorMessage = "Connection $connectionName not found."
+        throw $ErrorMessage
+    } else{
+        Write-Error -Message $_.Exception
+        throw $_.Exception
+    }
+}
+if($ResourceGroupName) {
+    $VMs = Get-AzureRmVM - ResourceGroupName $ResourceGroupName
+}
+else {
+    $VMs = Get-AzureRmVM
+}
+# Stop each of the VMs
+foreach ($VM in $VMs) {
+    $StopRtn = $VM | Stop-AzureRmVM - Force -ErrorAction Continue
+    if (!$StopRtn.IsSuccessStatusCode) {
+        # The VM failed to stop, so send notice
+        Write-Output ($VM.Name + " failed to stop")
+        Write-Error ($VM.Name + " failed to stop. Error was:") -ErrorAction Continue 
+        Write-Error (ConvertTo-Ison $StopRtn) -ErrorAction Continue
+    }
+    else {
+        # The VM stopped, so send notice
+        Write-Output ($VM.Name + " has been stopped")
+    }
+}
